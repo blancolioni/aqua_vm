@@ -11,6 +11,10 @@ package Aqua is
    subtype Word is Word_32;
    subtype Address_Type is Word;
 
+   Register_Count : constant := 256;
+
+   type Register_Index is new Word_8;
+
    Word_16_Address_Mask : constant Address_Type := 16#FFFF_FFFE#;
    Word_32_Address_Mask : constant Address_Type := 16#FFFF_FFFC#;
 
@@ -51,5 +55,19 @@ package Aqua is
      (Source : Word;
       Size   : Data_Size)
       return Word with Inline_Always;
+
+   type Debugger_Interface is interface;
+
+   function Get_Module_Name
+     (This    : Debugger_Interface;
+      Address : Address_Type)
+      return String
+      is abstract;
+
+   function To_Module_Local_Address
+     (This    : Debugger_Interface;
+      Address : Address_Type)
+      return Address_Type
+      is abstract;
 
 end Aqua;

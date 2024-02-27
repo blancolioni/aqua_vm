@@ -4,6 +4,8 @@ package body Aqua.Logging is
 
    Logging_Enabled : Boolean := False;
 
+   File : Ada.Text_IO.File_Type;
+
    ---------
    -- Log --
    ---------
@@ -11,7 +13,7 @@ package body Aqua.Logging is
    procedure Log (Message : String) is
    begin
       if Logging_Enabled then
-         Ada.Text_IO.Put_Line (Message);
+         Ada.Text_IO.Put_Line (File, Message);
       end if;
    end Log;
 
@@ -22,6 +24,7 @@ package body Aqua.Logging is
    procedure Start is
    begin
       Logging_Enabled := True;
+      Ada.Text_IO.Create (File, Ada.Text_IO.Out_File, "trace.txt");
    end Start;
 
    ----------
@@ -31,6 +34,7 @@ package body Aqua.Logging is
    procedure Stop is
    begin
       Logging_Enabled := False;
+      Ada.Text_IO.Close (File);
    end Stop;
 
 end Aqua.Logging;

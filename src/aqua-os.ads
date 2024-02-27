@@ -15,6 +15,7 @@ package Aqua.OS is
    type Instance is
      new Aqua.MM.Memory_Manager
      and Aqua.Ld.Link_Manager
+     and Debugger_Interface
    with private;
 
    type Reference is access all Instance'Class;
@@ -132,6 +133,11 @@ private
    package Module_Maps is
       new WL.String_Maps (Module_Reference);
 
+   function Find
+     (Map : Module_Maps.Map;
+      Addr : Address_Type)
+      return Module_Maps.Cursor;
+
    Base_Address : constant Segment_Address_Array :=
                     [Code  => 16#10_0000#,
                      Text  => 16#20_0000#,
@@ -156,7 +162,8 @@ private
 
    type Instance is
      new Aqua.MM.Memory_Manager
-     and Aqua.Ld.Link_Manager with
+     and Aqua.Ld.Link_Manager
+     and Debugger_Interface with
       record
          Bounds       : Segment_Address_Array := Base_Address;
          Bus          : Aqua.Bus.Reference;
@@ -188,6 +195,16 @@ private
       Address : Address_Type;
       Op      : Word_8;
       R       : Word_8);
+
+   overriding function Get_Module_Name
+     (This    : Instance;
+      Address : Address_Type)
+      return String;
+
+   overriding function To_Module_Local_Address
+     (This    : Instance;
+      Address : Address_Type)
+      return Address_Type;
 
    function Get_Protection_Bits
      (This    : Instance;

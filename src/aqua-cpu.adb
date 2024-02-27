@@ -99,6 +99,18 @@ package body Aqua.CPU is
       This.Bus := Aqua.Addressable.Reference (Bus);
    end Attach_Bus;
 
+   ---------------------
+   -- Attach_Debugger --
+   ---------------------
+
+   procedure Attach_Debugger
+     (This      : in out Instance'Class;
+      Debugger  : not null access Debugger_Interface'Class)
+   is
+   begin
+      This.Debugger := Debugger_Reference (Debugger);
+   end Attach_Debugger;
+
    ---------------------------
    -- Attach_Memory_Manager --
    ---------------------------
@@ -141,12 +153,9 @@ package body Aqua.CPU is
                XX : constant Word_32 :=
                       This.Execute_ALU (YY, ZZ,
                                         Control.ALU_Op, Control.Unsigned);
-               X_Name : String := Rec.X'Image;
             begin
-               X_Name (X_Name'First) := '%';
-               Aqua.Logging.Log
-                 (X_Name & " <- " & Aqua.Images.Hex_Image (XX));
                This.Set_R (Register_Index (Rec.X), XX);
+               This.Trace.Update (Rec.X, XX);
             end;
          when Load_Store =>
             if Control.Relative_Addr then
@@ -160,8 +169,7 @@ package body Aqua.CPU is
                                      then 262144 else 0));
                begin
                   This.Set_R (Register_Index (Rec.X), Address);
-                  Aqua.Logging.Log
-                    (Aqua.Images.Hex_Image (Address) & " ->" & Rec.X'Image);
+                  This.Trace.Update (Rec.X, Address);
                end;
             else
                declare
@@ -178,10 +186,12 @@ package body Aqua.CPU is
                      This.Execute_Load
                        (Address, Control.Size, Control.Unsigned, XX);
                      This.Set_R (Register_Index (Rec.X), XX);
+                     This.Trace.Fetch (Rec.X, Address, XX);
                   else
                      XX := This.Get_R (Register_Index (Rec.X));
                      This.Execute_Store
                        (Address, Control.Size, Control.Unsigned, XX);
+                     This.Trace.Store (Rec.X, Address, XX);
                   end if;
                end;
             end if;
@@ -206,18 +216,18 @@ package body Aqua.CPU is
                                  YY mod 2 = 1);
             begin
                Aqua.Logging.Log
-                 ("cond-set: "
-                  & "yy=" & Aqua.Images.Hex_Image (YY)
-                  & "; zz=" & Aqua.Images.Hex_Image (ZZ)
-                  & "; cond="
-                  & (if Control.Negated then "!" else "")
-                  & Control.Condition'Image
-                  & "; sat=" & (if Sat then "yes" else "no"));
+                 ("negated " & Control.Negated'Image
+                  & "; cond " & Control.Condition'Image
+                  & "; yy " & Aqua.Images.Hex_Image (YY)
+                  & "; zz " & Aqua.Images.Hex_Image (ZZ)
+                  & "; sat " & Sat'Image);
 
                if Sat then
                   This.Set_R (Register_Index (Rec.X), ZZ);
+                  This.Trace.Update (Rec.X, ZZ);
                elsif Control.Zero_Or_Set then
                   This.Set_R (Register_Index (Rec.X), 0);
+                  This.Trace.Update (Rec.X, 0);
                end if;
             end;
 
@@ -249,21 +259,13 @@ package body Aqua.CPU is
                   begin
                      This.State.G_J := This.State.PC;
                      This.State.Level := This.State.Level + 1;
-                     --  Ada.Text_IO.Set_Col
-                     --    (Ada.Text_IO.Positive_Count
-                     --       (This.State.Level * 2));
-                     --  Ada.Text_IO.Put_Line
-                     --    (Aqua.Images.Hex_Image (This.State.PC - 4)
-                     --     & ": "
-                     --     & "pushj "
-                     --     & Aqua.Images.Hex_Image (Address));
                      Aqua.Logging.Log
                        ("pushj "
                         & Aqua.Images.Hex_Image (Address));
                      This.Push (Register_Index (Rec.X));
                      This.State.PC := Address;
                      if Enable_Trace then
-                        for R in Register_Index range 0 .. 4 loop
+                        for R in Register_Index range 0 .. 2 loop
                            declare
                               Img : String := R'Image;
                            begin
@@ -303,19 +305,9 @@ package body Aqua.CPU is
                   if Control.Push then
                      This.State.G_J := This.State.PC;
                      This.State.Level := This.State.Level + 1;
-                     --  Ada.Text_IO.Set_Col
-                     --    (Ada.Text_IO.Positive_Count
-                     --       (This.State.Level * 2));
-                     --  Ada.Text_IO.Put_Line
-                     --    (Aqua.Images.Hex_Image (This.State.PC - 4)
-                     --     & ": "
-                     --     & "pushgo"
-                     --     & Rec.X'Image
-                     --     & " "
-                     --     & Aqua.Images.Hex_Image (Address));
                      Aqua.Logging.Log
-                       ("pushgo: rJ = "
-                        & Aqua.Images.Hex_Image (This.State.G_J));
+                       ("pushgo "
+                        & Aqua.Images.Hex_Image (Address));
                      This.Push (Register_Index (Rec.X));
                      This.State.PC := Address;
 
@@ -383,27 +375,14 @@ package body Aqua.CPU is
                            Register_Index (Rec.Z mod 32);
                      X : constant Word_32 := This.Get_G (G);
                   begin
-                     if Enable_Trace then
-                        Aqua.Logging.Log
-                          (Local_Register_Name (R)
-                           & " <- "
-                           & Global_Register_Name (G)
-                           & " "
-                           & Aqua.Images.Hex_Image (X));
-                     end if;
                      This.Set_R (R, X);
+                     This.Trace.Update (Rec.X, X);
                   end;
                when Pop =>
                   Aqua.Logging.Log ("pop: rJ = "
                                     & Aqua.Images.Hex_Image (This.State.G_J));
                   This.Pop (Register_Index (Rec.X));
                   This.State.PC := This.State.G_J;
-                  --  Ada.Text_IO.Set_Col
-                  --    (Ada.Text_IO.Positive_Count
-                  --       (This.State.Level * 2));
-                  --  Ada.Text_IO.Put_Line
-                  --    ("pop "
-                  --     & Aqua.Images.Hex_Image (This.State.PC));
                   This.State.Level := Integer'Max (This.State.Level - 1, 0);
                when Put =>
                   declare
@@ -412,18 +391,16 @@ package body Aqua.CPU is
                              then 256 * Word_32 (Rec.Y) + Word_32 (Rec.Z)
                              else This.Get_R (Register_Index (Rec.Z)));
                   begin
-                     if Enable_Trace then
-                        Aqua.Logging.Log
-                          (Global_Register_Name
-                             (Register_Index (Rec.X))
-                           & " <- "
-                           & (if Control.Immediate_Z
-                             then Aqua.Images.Hex_Image (ZZ)
-                             else Local_Register_Name
-                               (Register_Index (Rec.Z)))
-                           & " "
-                           & Aqua.Images.Hex_Image (ZZ));
-                     end if;
+                     Aqua.Logging.Log
+                       (Global_Register_Name
+                          (Register_Index (Rec.X))
+                        & " <- "
+                        & (if Control.Immediate_Z
+                          then Aqua.Images.Hex_Image (ZZ)
+                          else Local_Register_Name
+                            (Register_Index (Rec.Z)))
+                        & " "
+                        & Aqua.Images.Hex_Image (ZZ));
                      This.Set_G (Register_Index (Rec.X mod 32), ZZ);
                   end;
 
@@ -544,17 +521,10 @@ package body Aqua.CPU is
                         when Cond_Zero     =>
                           Value = 0,
                         when Cond_Positive =>
-                          Value < 16#1000_0000#,
+                          Value in 1 .. 16#1000_0000#,
                         when Cond_Odd      =>
                           Value mod 2 = 1);
    begin
-      Aqua.Logging.Log
-        ("branch: " & Aqua.Images.Hex_Image (Value)
-         & " "
-         & (if Negated then "not " else "")
-         & Condition'Image
-         & ": "
-         & (if Taken then "taken" else "ignored"));
       if Taken then
          This.State.PC := This.State.PC - 4
            + (4 * Offset
@@ -602,12 +572,6 @@ package body Aqua.CPU is
                W : Word_32;
             begin
                This.Get_Word_32 (Address, W);
-               if Enable_Trace then
-                  Aqua.Logging.Log
-                    (Aqua.Images.Hex_Image (Address)
-                     & " -> "
-                     & Aqua.Images.Hex_Image (W));
-               end if;
                Destination := W;
             end;
       end case;
@@ -669,20 +633,20 @@ package body Aqua.CPU is
          This.Set_R (255, This.State.G_J);
          This.State.PC := This.State.G_T;
 
-         if Enable_Trace then
-            Ada.Text_IO.Put_Line
-              ("BB <- " & Aqua.Images.Hex_Image (This.State.G_BB));
-            Ada.Text_IO.Put_Line
-              ("WW <- " & Aqua.Images.Hex_Image (This.State.G_WW));
-            Ada.Text_IO.Put_Line
-              ("XX <- " & Aqua.Images.Hex_Image (This.State.G_XX));
-            Ada.Text_IO.Put_Line
-              ("YY <- " & Aqua.Images.Hex_Image (This.State.G_YY));
-            Ada.Text_IO.Put_Line
-              ("ZZ <- " & Aqua.Images.Hex_Image (This.State.G_ZZ));
-            Ada.Text_IO.Put_Line
-              ("PC <- " & Aqua.Images.Hex_Image (This.State.PC));
-         end if;
+         --  if Enable_Trace then
+         --     Ada.Text_IO.Put_Line
+         --       ("BB <- " & Aqua.Images.Hex_Image (This.State.G_BB));
+         --     Ada.Text_IO.Put_Line
+         --       ("WW <- " & Aqua.Images.Hex_Image (This.State.G_WW));
+         --     Ada.Text_IO.Put_Line
+         --       ("XX <- " & Aqua.Images.Hex_Image (This.State.G_XX));
+         --     Ada.Text_IO.Put_Line
+         --       ("YY <- " & Aqua.Images.Hex_Image (This.State.G_YY));
+         --     Ada.Text_IO.Put_Line
+         --       ("ZZ <- " & Aqua.Images.Hex_Image (This.State.G_ZZ));
+         --     Ada.Text_IO.Put_Line
+         --       ("PC <- " & Aqua.Images.Hex_Image (This.State.PC));
+         --  end if;
       end if;
    end Execute_Trap;
 
@@ -754,15 +718,6 @@ package body Aqua.CPU is
                      else Address);
    begin
       This.Bus.Get_Word_32 (Phys_Addr, Value);
-      if Address = 16#001000EC#
-        or else Address = 16#001000E8#
-      then
-         Aqua.Logging.Log (Aqua.Images.Hex_Image (Address)
-                           & " -> "
-                           & Aqua.Images.Hex_Image (Phys_Addr)
-                           & " -> "
-                           & Aqua.Images.Hex_Image (Value));
-      end if;
    end Get_Word_32;
 
    --------------------------
@@ -902,18 +857,6 @@ package body Aqua.CPU is
 
       case G is
          when System_Global =>
-            if Enable_Trace
-              and then G /= 20
-            then
-               declare
-                  Img : String := G'Image;
-               begin
-                  Img (Img'First) := 'r';
-                  Aqua.Logging.Log
-                    (Img & " <- " & Aqua.Images.Hex_Image (V));
-               end;
-            end if;
-
             case System_Global (G) is
                when G_Bootstrap   =>
                   This.State.G_B := V;
@@ -971,15 +914,7 @@ package body Aqua.CPU is
          This.Stack_Room;
       end loop;
 
-      if Enable_Trace then
-         declare
-            Img : String := R'Image;
-         begin
-            Img (Img'First) := '%';
-            Aqua.Logging.Log
-              (Img & " <- " & Aqua.Images.Hex_Image (V));
-         end;
-      end if;
+      This.Trace.Update (Word_8 (R), V);
 
       if This.Is_Local (R) then
          declare
@@ -1044,14 +979,6 @@ package body Aqua.CPU is
                      then This.Memory.Map (Address, Write => True)
                      else Address);
    begin
-      if Phys_Addr = 16#EC# then
-         Aqua.Logging.Log (Aqua.Images.Hex_Image (Value)
-                           & " -> "
-                           & Aqua.Images.Hex_Image (Address)
-                           & " -> "
-                           & Aqua.Images.Hex_Image (Phys_Addr));
-      end if;
-
       This.Bus.Set_Word_32 (Phys_Addr, Value);
    end Set_Word_32;
 
@@ -1173,33 +1100,54 @@ package body Aqua.CPU is
                    then This.Memory.Map (This.State.PC, True, False, True)
                    else This.State.PC);
             This.Bus.Get_Word_32 (PC, IR);
-            Aqua.Logging.Log
-              (Aqua.Images.Hex_Image (This.State.PC)
-               & ": "
-               & Aqua.Images.Hex_Image (IR));
+
+            if Enable_Trace then
+               declare
+                  Current_Module : constant String :=
+                                     (if This.Debugger = null
+                                      then ""
+                                      else This.Debugger.Get_Module_Name
+                                        (This.State.PC));
+                  Module_Addr    : constant Address_Type :=
+                                     (if This.Debugger = null
+                                      then This.State.PC
+                                      else This.Debugger
+                                      .To_Module_Local_Address
+                                        (This.State.PC));
+               begin
+                  This.Trace.Initialize
+                    (Current_Module, This.State.PC, Module_Addr, IR);
+               end;
+            end if;
+
             This.State.PC := This.State.PC + 4;
             This.Execute (IR);
+
+            if Enable_Trace then
+               This.Trace.Save;
+            end if;
+
          exception
             when Bad_Instruction =>
                raise Bad_Instruction with
                  "addr=" & Aqua.Images.Hex_Image (Virtual_PC)
                  & " ir=" & Aqua.Images.Hex_Image (IR);
             when E : Aqua.MM.Protection_Fault =>
-               for Index in 0 .. This.State.G_L - 1 loop
-                  declare
-                     Img : String := Index'Image;
-                  begin
-                     Img (Img'First) := '%';
-                     Ada.Text_IO.Put
-                       (Ada.Text_IO.Standard_Error, Img);
-                     Ada.Text_IO.Set_Col
-                       (Ada.Text_IO.Standard_Error, 8);
-                     Ada.Text_IO.Put_Line
-                       (Ada.Text_IO.Standard_Error,
-                        Aqua.Images.Hex_Image
-                          (This.Get_R (Register_Index (Index))));
-                  end;
-               end loop;
+               --  for Index in 0 .. This.State.G_L - 1 loop
+               --     declare
+               --        Img : String := Index'Image;
+               --     begin
+               --        Img (Img'First) := '%';
+               --        Ada.Text_IO.Put
+               --          (Ada.Text_IO.Standard_Error, Img);
+               --        Ada.Text_IO.Set_Col
+               --          (Ada.Text_IO.Standard_Error, 8);
+               --        Ada.Text_IO.Put_Line
+               --          (Ada.Text_IO.Standard_Error,
+               --           Aqua.Images.Hex_Image
+               --             (This.Get_R (Register_Index (Index))));
+               --     end;
+               --  end loop;
 
                raise Aqua.MM.Protection_Fault with
                  "pc " & Aqua.Images.Hex_Image (Virtual_PC)

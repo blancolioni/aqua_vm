@@ -144,6 +144,53 @@ package body Aqua.OS is
 
    end External_Reference;
 
+   ----------
+   -- Find --
+   ----------
+
+   function Find
+     (Map  : Module_Maps.Map;
+      Addr : Address_Type)
+      return Module_Maps.Cursor
+   is
+      Best_Base : Address_Type := 0;
+      Best_Pos  : Module_Maps.Cursor := Module_Maps.No_Element;
+   begin
+      for Position in Map.Iterate loop
+         declare
+            Element : constant Module_Reference := Map (Position);
+            Base    : constant Address_Type :=
+                        Element.Virt_Base (Code);
+         begin
+            if Addr >= Base
+              and then Base > Best_Base
+            then
+               Best_Base := Base;
+               Best_Pos  := Position;
+            end if;
+         end;
+      end loop;
+      return Best_Pos;
+   end Find;
+
+   ---------------------
+   -- Get_Module_Name --
+   ---------------------
+
+   overriding function Get_Module_Name
+     (This    : Instance;
+      Address : Address_Type)
+      return String
+   is
+      Position : constant Module_Maps.Cursor := Find (This.Modules, Address);
+   begin
+      if Module_Maps.Has_Element (Position) then
+         return Module_Maps.Element (Position).Name;
+      else
+         return "";
+      end if;
+   end Get_Module_Name;
+
    -------------------------
    -- Get_Protection_Bits --
    -------------------------
@@ -608,13 +655,18 @@ package body Aqua.OS is
                   raise Constraint_Error with
                     "cannot find module: " & Module_Name;
                end if;
-               Aqua.Linker.Load (This, Path);
-               This.Modules.Insert
-                 (Module_Name,
-                  Module_Reference'
-                    (Module_Name'Length, Module_Name,
-                     [others => 0],
-                     [others => 0]));
+
+               declare
+                  Bases : constant Segment_Address_Array := This.Bounds;
+               begin
+                  Aqua.Linker.Load (This, Path);
+                  This.Modules.Insert
+                    (Module_Name,
+                     Module_Reference'
+                       (Module_Name'Length, Module_Name,
+                        Virt_Base => Bases,
+                        Phys_Base => [others => 0]));
+               end;
             end;
          end if;
 
@@ -656,6 +708,24 @@ package body Aqua.OS is
          end;
       end loop;
    end Resolve_Pending_References;
+
+   -----------------------------
+   -- To_Module_Local_Address --
+   -----------------------------
+
+   overriding function To_Module_Local_Address
+     (This    : Instance;
+      Address : Address_Type)
+      return Address_Type
+   is
+      Position : constant Module_Maps.Cursor := Find (This.Modules, Address);
+   begin
+      if Module_Maps.Has_Element (Position) then
+         return Address - Module_Maps.Element (Position).Virt_Base (Code);
+      else
+         return Address;
+      end if;
+   end To_Module_Local_Address;
 
    -------------------
    -- Trace_Loading --

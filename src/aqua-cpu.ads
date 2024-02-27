@@ -1,5 +1,6 @@
 with Aqua.Addressable;
 with Aqua.MM;
+private with Aqua.Tracing;
 
 package Aqua.CPU is
 
@@ -19,6 +20,10 @@ package Aqua.CPU is
      (This   : in out Instance'Class;
       Memory : not null access Aqua.MM.Memory_Manager'Class);
 
+   procedure Attach_Debugger
+     (This : in out Instance'Class;
+      Debugger : not null access Debugger_Interface'Class);
+
    procedure Start
      (This             : in out Instance'Class;
       Initial_Location : Address_Type;
@@ -27,10 +32,6 @@ package Aqua.CPU is
    procedure Trace (Enabled : Boolean);
 
 private
-
-   Register_Count : constant := 256;
-
-   type Register_Index is new Word_8;
 
    Register_Window_Size : constant := 512;
    type Window_Register_Index is mod Register_Window_Size;
@@ -70,6 +71,7 @@ private
          PC         : Word := 16#C000#;
          Halted     : Boolean := False;
          Privileged : Boolean := True;
+         Tracing    : Boolean := False;
          G_B        : Word := 0;
          G_BB       : Word := 0;
          G_D        : Word := 0;
@@ -91,12 +93,16 @@ private
          Level      : Natural := 0;
       end record;
 
+   type Debugger_Reference is access all Debugger_Interface'Class;
+
    type Instance is new Aqua.Addressable.Instance with
       record
          Bus        : Aqua.Addressable.Reference;
          Memory     : Memory_Manager_Reference;
          Mapping    : Boolean := False;
          State      : CPU_State;
+         Trace      : Aqua.Tracing.Element;
+         Debugger   : Debugger_Reference;
       end record;
 
    overriding procedure Get_Word_8
