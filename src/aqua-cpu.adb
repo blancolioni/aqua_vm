@@ -620,7 +620,41 @@ package body Aqua.CPU is
       end if;
 
       if X = 0 and then Y = 0 and then Z = 0 then
+         declare
+            Msg_Addr : constant Address_Type := This.Get_R (255);
+         begin
+            if Msg_Addr /= 0 then
+               declare
+                  Length : Word_32;
+                  P      : Address_Type := Msg_Addr + 4;
+               begin
+                  This.Get_Word_32 (Msg_Addr, Length);
+
+                  declare
+                     Message : String (1 .. Natural (Length));
+                  begin
+                     for I in 1 .. Natural (Length) loop
+                        declare
+                           Ch : Word_32;
+                        begin
+                           This.Get_Word_32 (P, Ch);
+                           P := P + 4;
+                           Message (I) := Character'Val (Ch);
+                        end;
+                     end loop;
+                     Ada.Text_IO.Put_Line
+                       (Ada.Text_IO.Standard_Error, Message);
+                  end;
+               end;
+            end if;
+         exception
+            when Aqua.MM.Protection_Fault =>
+               Ada.Text_IO.Put_Line
+                 ("halt: msg = " & Aqua.Images.Hex_Image (Msg_Addr));
+         end;
+
          This.State.Halted := True;
+
       else
          This.State.G_WW := This.State.PC;
          This.State.G_XX :=
