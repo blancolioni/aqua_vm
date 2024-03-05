@@ -20,8 +20,24 @@ package body Aqua.Server is
          This.CPU := Aqua.Loader.Create_CPU (This.Bus, Configuration_Path);
          This.OS := Aqua.OS.Create (This.Bus);
          This.CPU.Attach_Memory_Manager (This.OS);
+         This.CPU.Attach_Debugger (This.OS);
       end return;
    end Create;
+
+   --------------------
+   -- Install_Device --
+   --------------------
+
+   procedure Install_Device
+     (This   : in out Instance;
+      Base   : Address_Type;
+      Bound  : Address_Type;
+      Device : Aqua.Devices.Reference)
+   is
+   begin
+      Device.Initialize (Base, Bound);
+      This.Bus.Install (Device);
+   end Install_Device;
 
    ----------
    -- Load --
@@ -45,7 +61,7 @@ package body Aqua.Server is
    is
    begin
       Aqua.CPU.Trace (Trace);
-      Aqua.OS.Trace_Loading (Trace);
+      --  Aqua.OS.Trace_Loading (Trace);
       This.CPU.Start (This.Start);
    end Run;
 

@@ -1,5 +1,6 @@
 private with Aqua.Bus;
 private with Aqua.CPU;
+with Aqua.Devices;
 private with Aqua.OS;
 
 package Aqua.Server is
@@ -12,6 +13,12 @@ package Aqua.Server is
      (Configuration_Path : String;
       Object_Paths       : String)
       return Reference;
+
+   procedure Install_Device
+     (This   : in out Instance;
+      Base   : Address_Type;
+      Bound  : Address_Type;
+      Device : Aqua.Devices.Reference);
 
    procedure Load
      (This : in out Instance;
