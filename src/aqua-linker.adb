@@ -32,6 +32,23 @@ package body Aqua.Linker is
       Path : String)
       return Address_Type
    is
+   begin
+      return Load (OS, Path, null);
+   end Load;
+
+   ----------
+   -- Load --
+   ----------
+
+   function Load
+     (OS      : not null access Aqua.OS.Instance'Class;
+      Path    : String;
+      On_Note : access procedure
+        (Name : String;
+         Tag  : Word_32;
+         Description : String))
+      return Address_Type
+   is
       use WL.Files.ELF;
       File : File_Type;
 
@@ -44,10 +61,10 @@ package body Aqua.Linker is
 
       function Find_Loader (Section : Elf_Word_16) return Aqua.OS.Loader_Type;
 
-      procedure Load_Program_Bits
+      procedure Load_Notes
         (Section : Section_Entry);
 
-      procedure Load_Relocation
+      procedure Load_Program_Bits
         (Section : Section_Entry);
 
       procedure Load_Symbol
@@ -82,6 +99,84 @@ package body Aqua.Linker is
          raise Constraint_Error with
            "no loader for section" & Section'Image;
       end Find_Loader;
+
+      ----------------
+      -- Load_Notes --
+      ----------------
+
+      procedure Load_Notes
+        (Section : Section_Entry)
+      is
+         use System.Storage_Elements;
+         Data  : Storage_Array (1 .. Storage_Count (Get_Size (Section)));
+         Index : Storage_Offset := 0;
+
+         function Next_String (Length : Natural) return String;
+         function Next_Word return Word_32;
+         function Next_Octet return Word_8;
+
+         ----------------
+         -- Next_Octet --
+         ----------------
+
+         function Next_Octet return Word_8 is
+         begin
+            Index := Index + 1;
+            return Word_8 (Data (Index));
+         end Next_Octet;
+
+         -----------------
+         -- Next_String --
+         -----------------
+
+         function Next_String (Length : Natural) return String is
+         begin
+            return S : String (1 .. Length) do
+               for Ch of S loop
+                  Ch := Character'Val (Next_Octet);
+               end loop;
+               if Length mod 4 /= 0 then
+                  for I in 1 .. 4 - Length mod 4 loop
+                     declare
+                        X : constant Word_8 := Next_Octet;
+                     begin
+                        pragma Assert (X = 0);
+                     end;
+                  end loop;
+               end if;
+            end return;
+         end Next_String;
+
+         ---------------
+         -- Next_Word --
+         ---------------
+
+         function Next_Word return Word_32 is
+         begin
+            return W : Word_32 := 0 do
+               for I in 1 .. 4 loop
+                  W := W * 256 + Word_32 (Next_Octet);
+               end loop;
+            end return;
+         end Next_Word;
+
+      begin
+         Read (File, Get_Offset (Section), Data);
+         while Index < Data'Last loop
+            declare
+               Name_Length : constant Word_32 := Next_Word;
+               Desc_Length : constant Word_32 := Next_Word;
+               Tag         : constant Word_32 := Next_Word;
+               Name        : constant String :=
+                               Next_String (Natural (Name_Length));
+               Desc        : constant String :=
+                               Next_String (Natural (Desc_Length));
+            begin
+               On_Note (Name, Tag, Desc);
+            end;
+         end loop;
+
+      end Load_Notes;
 
       -----------------------
       -- Load_Program_Bits --
@@ -141,41 +236,6 @@ package body Aqua.Linker is
             Defined    => Is_Defined (Symbol));
       end Load_Relocation;
 
-      ---------------------
-      -- Load_Relocation --
-      ---------------------
-
-      procedure Load_Relocation
-        (Section : Section_Entry)
-      is
-         Reloc_Index : constant Elf_Word_32 := Get_Info (Section);
-         Sym_Index   : constant Elf_Word_32 := Get_Link (Section);
-         Sym_Seg     : Aqua.OS.Memory_Segment;
-         pragma Unreferenced (Sym_Seg);
-         Have_Reloc  : Boolean := False;
-         Have_Sym    : Boolean := False;
-
-      begin
-         for Segment in Aqua.OS.Memory_Segment loop
-            if Indices (Segment) = Reloc_Index then
-               Have_Reloc := True;
-            elsif Indices (Segment) = Sym_Index then
-               Sym_Seg := Segment;
-               Have_Sym := True;
-            end if;
-         end loop;
-
-         pragma Assert (Have_Reloc,
-                        "no such segment for relocation:"
-                        & Reloc_Index'Image);
-         pragma Assert (Have_Sym,
-                        "no such symbol table segment:"
-                        & Sym_Index'Image);
-
-         --  Iterate_Relocation_Entries (File, Section, Relocate'Access);
-
-      end Load_Relocation;
-
       -----------------
       -- Load_Symbol --
       -----------------
@@ -224,16 +284,18 @@ package body Aqua.Linker is
 
       Aqua.Logging.Log ("loading: " & Path);
 
+      OS.Start_Load (Ada.Directories.Base_Name (Path));
+
       Open (File, In_File, Path);
       Iterate_Sections (File, Sht_Progbits, Load_Program_Bits'Access);
       Iterate_Symbols (File, Load_Symbol'Access);
       Iterate_Relocation (File, Load_Relocation'Access);
 
-      if False then
-         Iterate_Sections (File, Sht_Progbits, Load_Relocation'Access);
-      end if;
-
       OS.Resolve_Pending_References;
+
+      if On_Note /= null then
+         Iterate_Sections (File, Sht_Note, Load_Notes'Access);
+      end if;
 
       return Addr : constant Address_Type :=
         Address_Type (Get_Start (File))
