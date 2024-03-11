@@ -1208,6 +1208,13 @@ package body Aqua.CPU is
       if Enable_Trace then
          Aqua.Logging.Stop;
       end if;
+
+   exception
+      when others =>
+         if Enable_Trace then
+            Aqua.Logging.Stop;
+         end if;
+         raise;
    end Start;
 
    -----------
