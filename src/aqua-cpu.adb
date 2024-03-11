@@ -1111,7 +1111,13 @@ package body Aqua.CPU is
          Aqua.Logging.Start;
       end if;
 
-      This.Reset;
+      This.State.PC := Initial_Location;
+      This.State.Halted := False;
+      This.State.G_L := 0;
+      This.State.G_G := 255;
+      This.State.G_O := 0;
+      This.State.G_S := 0;
+
 
       declare
          R : Register_Index := 0;
@@ -1121,8 +1127,6 @@ package body Aqua.CPU is
             R := R + 1;
          end loop;
       end;
-
-      This.State.PC := Initial_Location;
 
       while not This.State.Halted loop
          declare

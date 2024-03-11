@@ -29,6 +29,8 @@ package Aqua.CPU is
       Initial_Location : Address_Type;
       Arguments        : Array_Of_Words := []);
 
+   procedure Reset (This : in out Instance'Class);
+
    procedure Trace (Enabled : Boolean);
 
 private
@@ -206,7 +208,5 @@ private
    procedure Execute
      (This : in out Instance'Class;
       IR   : Word_32);
-
-   procedure Reset (This : in out Instance'Class);
 
 end Aqua.CPU;
