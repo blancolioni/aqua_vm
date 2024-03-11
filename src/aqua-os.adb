@@ -217,6 +217,33 @@ package body Aqua.OS is
       return (others => False);
    end Get_Protection_Bits;
 
+   ------------------------
+   -- Get_Symbol_Address --
+   ------------------------
+
+   function Get_Symbol_Address
+     (This : Instance;
+      Name : String)
+      return Address_Type
+   is
+      Position : constant Symbol_Reference_Maps.Cursor :=
+                   This.Symbols.Find (Name);
+   begin
+      if Symbol_Reference_Maps.Has_Element (Position) then
+         declare
+            Rec : Symbol_Reference renames This.Symbols (Position);
+         begin
+            if Rec.Defined then
+               return Rec.Virtual_Addr;
+            else
+               return 0;
+            end if;
+         end;
+      else
+         return 0;
+      end if;
+   end Get_Symbol_Address;
+
    ----------
    -- Load --
    ----------
@@ -656,17 +683,7 @@ package body Aqua.OS is
                     "cannot find module: " & Module_Name;
                end if;
 
-               declare
-                  Bases : constant Segment_Address_Array := This.Bounds;
-               begin
-                  Aqua.Linker.Load (This, Path);
-                  This.Modules.Insert
-                    (Module_Name,
-                     Module_Reference'
-                       (Module_Name'Length, Module_Name,
-                        Virt_Base => Bases,
-                        Phys_Base => [others => 0]));
-               end;
+               Aqua.Linker.Load (This, Path);
             end;
          end if;
 
@@ -708,6 +725,24 @@ package body Aqua.OS is
          end;
       end loop;
    end Resolve_Pending_References;
+
+   ----------------
+   -- Start_Load --
+   ----------------
+
+   procedure Start_Load
+     (This : in out Instance;
+      Name : String)
+   is
+      Bases : constant Segment_Address_Array := This.Bounds;
+   begin
+      This.Modules.Insert
+        (Name,
+         Module_Reference'
+           (Name'Length, Name,
+            Virt_Base => Bases,
+            Phys_Base => [others => 0]));
+   end Start_Load;
 
    -----------------------------
    -- To_Module_Local_Address --

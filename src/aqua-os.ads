@@ -61,6 +61,15 @@ package Aqua.OS is
    procedure Resolve_Pending_References
      (This : not null access Instance'Class);
 
+   function Get_Symbol_Address
+     (This : Instance;
+      Name : String)
+      return Address_Type;
+
+   procedure Start_Load
+     (This : in out Instance;
+      Name : String);
+
    procedure Trace_Loading (Enabled : Boolean);
 
 private
