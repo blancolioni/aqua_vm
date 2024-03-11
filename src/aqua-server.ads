@@ -24,9 +24,28 @@ package Aqua.Server is
      (This : in out Instance;
       Path : String);
 
+   procedure Load
+     (This    : in out Instance;
+      Path    : String;
+      On_Note : access procedure
+        (Name : String;
+         Tag  : Word_32;
+         Description : String));
+
+   function Get_Symbol_Address
+     (This : Instance;
+      Name : String)
+      return Address_Type;
+
    procedure Run
      (This  : in out Instance;
       Trace : Boolean := False);
+
+   procedure Run
+     (This      : in out Instance;
+      Start     : Address_Type;
+      Arguments : Aqua.Array_Of_Words;
+      Trace     : Boolean := False);
 
 private
 
@@ -37,5 +56,11 @@ private
          OS    : Aqua.OS.Reference;
          Start : Aqua.Address_Type;
       end record;
+
+   function Get_Symbol_Address
+     (This : Instance;
+      Name : String)
+      return Address_Type
+   is (This.OS.Get_Symbol_Address (Name));
 
 end Aqua.Server;

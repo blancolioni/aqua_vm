@@ -48,7 +48,23 @@ package body Aqua.Server is
       Path : String)
    is
    begin
-      This.Start := Aqua.Linker.Load (This.OS, Path);
+      This.Load (Path, null);
+   end Load;
+
+   ----------
+   -- Load --
+   ----------
+
+   procedure Load
+     (This    : in out Instance;
+      Path    : String;
+      On_Note : access procedure
+        (Name : String;
+         Tag  : Word_32;
+         Description : String))
+   is
+   begin
+      This.Start := Aqua.Linker.Load (This.OS, Path, On_Note);
    end Load;
 
    ---------
@@ -63,6 +79,22 @@ package body Aqua.Server is
       Aqua.CPU.Trace (Trace);
       --  Aqua.OS.Trace_Loading (Trace);
       This.CPU.Start (This.Start);
+   end Run;
+
+   ---------
+   -- Run --
+   ---------
+
+   procedure Run
+     (This      : in out Instance;
+      Start     : Address_Type;
+      Arguments : Aqua.Array_Of_Words;
+      Trace     : Boolean := False)
+   is
+   begin
+      Aqua.CPU.Trace (Trace);
+      --  Aqua.OS.Trace_Loading (Trace);
+      This.CPU.Start (Start, Arguments);
    end Run;
 
 end Aqua.Server;
