@@ -1,8 +1,7 @@
-with Ada.Text_IO;
-
 with Aqua.Files;
 with Aqua.Images;
 with Aqua.Linker;
+with Aqua.Logging;
 with Aqua.Names;
 
 with Aqua.Devices.Linker;
@@ -12,6 +11,25 @@ package body Aqua.OS is
 
    Trace_Relocation : constant Boolean := False;
    Trace_Loads      : Boolean := False;
+
+   type OS_Device_Instance is new Aqua.Devices.Instance with
+      record
+         OS : Reference;
+      end record;
+
+   overriding function Name (This : OS_Device_Instance) return String
+   is ("os");
+
+   overriding procedure Get_Word_32
+     (This    : in out OS_Device_Instance;
+      Address : Address_Type;
+      Value   : out Word_32);
+
+   overriding procedure Set_Word_32
+     (This    : in out OS_Device_Instance;
+      Address : Address_Type;
+      Value   : Word_32)
+   is null;
 
    procedure Resolve_Reference
      (This      : not null access Instance'Class;
@@ -72,6 +90,16 @@ package body Aqua.OS is
    begin
       This.Bus := Aqua.Bus.Reference (Bus);
       Bus.Scan_Devices (Process'Access);
+
+      declare
+         D : constant Aqua.Devices.Reference :=
+               new OS_Device_Instance'
+                 (Aqua.Devices.Instance with OS => This);
+      begin
+         D.Initialize (16#FFFF_E000#, 16#FFFF_E100#);
+         Bus.Install (D);
+      end;
+
       This.Protection := [
                           (16#100#, 16#1FF#, (True, False, True)),
                           (16#200#, 16#2FF#, (True, False, False)),
@@ -96,7 +124,7 @@ package body Aqua.OS is
                     Module & "." & Name;
    begin
       if Trace_Relocation then
-         Ada.Text_IO.Put_Line
+         Aqua.Logging.Log
            (Full_Name & " = "
             & Aqua.Images.Hex_Image (Address_Type (Offset) + Loader.Base));
       end if;
@@ -126,7 +154,7 @@ package body Aqua.OS is
    is
    begin
       if Trace_Relocation then
-         Ada.Text_IO.Put_Line
+         Aqua.Logging.Log
            ("EXT: " & Module & "." & Name);
       end if;
 
@@ -204,7 +232,7 @@ package body Aqua.OS is
       for Element of This.Protection loop
          if Page in Element.Base .. Element.Bound - 1 then
             if False then
-               Ada.Text_IO.Put_Line
+               Aqua.Logging.Log
                  (Aqua.Images.Hex_Image (Word_32 (Page) * 16#1000#)
                   & ": "
                   & (if Element.Protection.R then "r" else "-")
@@ -244,6 +272,58 @@ package body Aqua.OS is
       end if;
    end Get_Symbol_Address;
 
+   -----------------
+   -- Get_Word_32 --
+   -----------------
+
+   overriding procedure Get_Word_32
+     (This    : in out OS_Device_Instance;
+      Address : Address_Type;
+      Value   : out Word_32)
+   is
+      Register : constant Word_32 := Address / 4;
+   begin
+      if Register = 0 then
+         Value := This.OS.Handlers;
+      else
+         Value := 0;
+      end if;
+   end Get_Word_32;
+
+   -------------------------------
+   -- Install_Exception_Handler --
+   -------------------------------
+
+   procedure Install_Exception_Handler
+     (This        : in out Instance;
+      Base, Bound : Address_Type;
+      Handler     : Address_Type)
+   is
+      Start : constant Address_Type :=
+                This.Bounds (Text);
+      Dest  : Address_Type := Start;
+   begin
+
+      This.Bus.Set_Word_32
+        (Address => This.Map (Dest),
+         Value   => Base);
+      Dest := Dest + 4;
+      This.Bus.Set_Word_32
+        (Address => This.Map (Dest),
+         Value   => Bound);
+      Dest := Dest + 4;
+      This.Bus.Set_Word_32
+        (Address => This.Map (Dest),
+         Value   => Handler);
+      Dest := Dest + 4;
+      This.Bus.Set_Word_32
+        (Address => This.Map (Dest),
+         Value   => This.Handlers);
+      Dest := Dest + 4;
+      This.Bounds (Text) := Dest;
+      This.Handlers := Start;
+   end Install_Exception_Handler;
+
    ----------
    -- Load --
    ----------
@@ -266,7 +346,7 @@ package body Aqua.OS is
    begin
 
       if Trace_Loads then
-         Ada.Text_IO.Put_Line
+         Aqua.Logging.Log
            ("load: segment " & Segment'Image
             & " start " & Aqua.Images.Hex_Image (Dest)
             & " phys " & Aqua.Images.Hex_Image (This.Map (Dest))
@@ -344,7 +424,7 @@ package body Aqua.OS is
                       This.Free_Pages (This.Free_Pages.First);
          begin
             if False then
-               Ada.Text_IO.Put_Line
+               Aqua.Logging.Log
                  ("map: "
                   & Aqua.Images.Hex_Image
                     (Word_32 (Virtual_Page) * Page_Size)
@@ -397,7 +477,7 @@ package body Aqua.OS is
    begin
 
       if Trace_Relocation then
-         Ada.Text_IO.Put_Line
+         Aqua.Logging.Log
            ("Relocate: " & Name
             & ": loader base=" & Aqua.Images.Hex_Image (Loader.Base)
             & "; sym base=" & Aqua.Images.Hex_Image (Sym_Loader.Base)
@@ -410,13 +490,6 @@ package body Aqua.OS is
       if not Defined then
 
          if Context = No_Context then
-
-            if Trace_Relocation then
-               Ada.Text_IO.Put_Line
-                 ("no context: " & Name
-                  & " at "
-                  & Aqua.Images.Hex_Image (Loader_Addr));
-            end if;
 
             declare
                Position : constant Undefined_Reference_Maps.Cursor :=
@@ -454,13 +527,6 @@ package body Aqua.OS is
       else
          case Context is
             when No_Context =>
-               if Trace_Relocation then
-                  Ada.Text_IO.Put_Line
-                    ("set no context " & Name
-                     & " at " & Aqua.Images.Hex_Image (Loader_Addr)
-                     & " (phys " & Aqua.Images.Hex_Image (Address) & ")"
-                     & " to " & Aqua.Images.Hex_Image (Loader_Value));
-               end if;
                Loader.OS.Bus.Set_Word_32 (Address, Loader_Value);
             when Relative_XY =>
                declare
@@ -530,14 +596,14 @@ package body Aqua.OS is
       Result      : constant Address_Type := This.Bounds (Heap);
    begin
       if Actual_Size > 65536 then
-         Ada.Text_IO.Put_Line
+         Aqua.Logging.Log
            ("size too big: " & Aqua.Images.Hex_Image (Actual_Size));
          return 0;
       end if;
 
       This.Bounds (Heap) := @ + Actual_Size;
       if False then
-         Ada.Text_IO.Put_Line
+         Aqua.Logging.Log
            ("request size "
             & Aqua.Images.Hex_Image (Actual_Size)
             & "; returning "
@@ -598,11 +664,6 @@ package body Aqua.OS is
             when No_Context =>
                This.Bus.Set_Word_32
                  (This.Map (Address), Value);
-               if Trace_Relocation then
-                  Ada.Text_IO.Put_Line
-                    ("set no context " & Aqua.Images.Hex_Image (Address)
-                     & " to " & Aqua.Images.Hex_Image (Value));
-               end if;
 
             when Relative_XY =>
                declare
@@ -652,16 +713,11 @@ package body Aqua.OS is
       Module_Name : constant String :=
                       Aqua.Names.Get_Module_Name (Full_Name);
    begin
-      if Trace_Relocation then
-         Ada.Text_IO.Put_Line
-           ("looking for: " & Full_Name);
-      end if;
-
       if This.Symbols.Contains (Full_Name)
         and then This.Symbols (Full_Name).Defined
       then
          if Trace_Relocation then
-            Ada.Text_IO.Put_Line
+            Aqua.Logging.Log
               ("Found " & Full_Name & " at "
                & Aqua.Images.Hex_Image
                  (This.Symbols (Full_Name).Virtual_Addr));
@@ -689,7 +745,7 @@ package body Aqua.OS is
 
          if This.Symbols.Contains (Full_Name) then
             if Trace_Relocation then
-               Ada.Text_IO.Put_Line
+               Aqua.Logging.Log
                  ("Found " & Full_Name & " at "
                   & Aqua.Images.Hex_Image
                     (This.Symbols (Full_Name).Virtual_Addr));

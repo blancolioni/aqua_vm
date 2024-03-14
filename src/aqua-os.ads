@@ -70,6 +70,11 @@ package Aqua.OS is
      (This : in out Instance;
       Name : String);
 
+   procedure Install_Exception_Handler
+     (This        : in out Instance;
+      Base, Bound : Address_Type;
+      Handler     : Address_Type);
+
    procedure Trace_Loading (Enabled : Boolean);
 
 private
@@ -174,16 +179,17 @@ private
      and Aqua.Ld.Link_Manager
      and Debugger_Interface with
       record
-         Bounds       : Segment_Address_Array := Base_Address;
-         Bus          : Aqua.Bus.Reference;
-         Pages        : Page_Range_Lists.List;
-         Free_Pages   : Page_Range_Lists.List;
-         Memory_Map   : Map_Entry_Lists.List;
-         Protection   : Page_Protection_Lists.List;
-         Symbols      : Symbol_Reference_Maps.Map;
-         Modules      : Module_Maps.Map;
-         Refs         : Undefined_Reference_Maps.Map;
-         Pending_Refs : Undefined_Reference_Maps.Map;
+         Bounds        : Segment_Address_Array := Base_Address;
+         Bus           : Aqua.Bus.Reference;
+         Pages         : Page_Range_Lists.List;
+         Free_Pages    : Page_Range_Lists.List;
+         Memory_Map    : Map_Entry_Lists.List;
+         Protection    : Page_Protection_Lists.List;
+         Symbols       : Symbol_Reference_Maps.Map;
+         Modules       : Module_Maps.Map;
+         Refs          : Undefined_Reference_Maps.Map;
+         Pending_Refs  : Undefined_Reference_Maps.Map;
+         Handlers      : Address_Type := 0;
       end record;
 
    overriding function Map

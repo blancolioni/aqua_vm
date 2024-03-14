@@ -82,6 +82,9 @@ package body Aqua.Linker is
          Info         : Octet;
          Symbol       : Symbol_Table_Entry);
 
+      procedure Install_Exception_Handler
+        (Description : String);
+
       -----------------
       -- Find_Loader --
       -----------------
@@ -99,6 +102,42 @@ package body Aqua.Linker is
          raise Constraint_Error with
            "no loader for section" & Section'Image;
       end Find_Loader;
+
+      -------------------------------
+      -- Install_Exception_Handler --
+      -------------------------------
+
+      procedure Install_Exception_Handler
+        (Description : String)
+      is
+         Separator_1 : constant Natural :=
+                         Ada.Strings.Fixed.Index (Description, ",");
+         Separator_2 : constant Natural :=
+                         (if Separator_1 > 0
+                          then Ada.Strings.Fixed.Index
+                            (Description, ",", Separator_1 + 1)
+                          else 0);
+      begin
+         if Separator_1 = 0 or else Separator_2 = 0 then
+            raise Constraint_Error with
+              "invalid exception handler: " & Description;
+         end if;
+
+         declare
+            Base_Label : constant String :=
+                           Description (Description'First .. Separator_1 - 1);
+            Bound_Label : constant String :=
+                            Description (Separator_1 + 1 .. Separator_2 - 1);
+            Handler_Label : constant String :=
+                              Description
+                                (Separator_2 + 1 .. Description'Last);
+         begin
+            OS.Install_Exception_Handler
+              (Base    => OS.Get_Symbol_Address (Base_Label),
+               Bound   => OS.Get_Symbol_Address (Bound_Label),
+               Handler => OS.Get_Symbol_Address (Handler_Label));
+         end;
+      end Install_Exception_Handler;
 
       ----------------
       -- Load_Notes --
@@ -172,7 +211,11 @@ package body Aqua.Linker is
                Desc        : constant String :=
                                Next_String (Natural (Desc_Length));
             begin
-               On_Note (Name, Tag, Desc);
+               if Name = "exception_handler" then
+                  Install_Exception_Handler (Desc);
+               elsif On_Note /= null then
+                  On_Note (Name, Tag, Desc);
+               end if;
             end;
          end loop;
 
@@ -293,9 +336,7 @@ package body Aqua.Linker is
 
       OS.Resolve_Pending_References;
 
-      if On_Note /= null then
-         Iterate_Sections (File, Sht_Note, Load_Notes'Access);
-      end if;
+      Iterate_Sections (File, Sht_Note, Load_Notes'Access);
 
       return Addr : constant Address_Type :=
         Address_Type (Get_Start (File))
