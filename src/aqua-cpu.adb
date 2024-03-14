@@ -699,7 +699,7 @@ package body Aqua.CPU is
       elsif This.Is_Local (R) then
          return This.State.Window (This.To_Window_Index (R));
       else
-         return This.Get_G (R);
+         return This.State.Global (R);
       end if;
    end Get_R;
 
@@ -887,7 +887,9 @@ package body Aqua.CPU is
       pragma Assert (G /= G_Global or else V mod 256 >= 32,
                      "G must be >= 32");
       pragma Assert (G /= G_Local or else V mod 256 < Word (This.State.G_G),
-                    "L must be < G");
+                     "L" & This.State.G_L'Image
+                     & " must be < G"
+                     & This.State.G_G'Image);
 
       case G is
          when System_Global =>
@@ -943,10 +945,12 @@ package body Aqua.CPU is
       V    : Word)
    is
    begin
-      while This.Is_Marginal (R) loop
-         This.Set_G (G_Local, This.Get_G (G_Local) + 1);
-         This.Stack_Room;
-      end loop;
+      if R < This.State.G_G then
+         while This.Is_Marginal (R) loop
+            This.Set_G (G_Local, This.Get_G (G_Local) + 1);
+            This.Stack_Room;
+         end loop;
+      end if;
 
       This.Trace.Update (Word_8 (R), V);
 
@@ -960,7 +964,7 @@ package body Aqua.CPU is
             This.State.Window (W) := V;
          end;
       else
-         This.Set_G (R, V);
+         This.State.Global (R) := V;
       end if;
 
    end Set_R;
@@ -1114,7 +1118,6 @@ package body Aqua.CPU is
       This.State.PC := Initial_Location;
       This.State.Halted := False;
       This.State.G_L := 0;
-      This.State.G_G := 255;
       This.State.G_O := 0;
       This.State.G_S := 0;
 
