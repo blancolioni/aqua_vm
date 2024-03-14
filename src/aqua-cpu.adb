@@ -265,7 +265,7 @@ package body Aqua.CPU is
                      This.Push (Register_Index (Rec.X));
                      This.State.PC := Address;
                      if Enable_Trace then
-                        for R in Register_Index range 0 .. 2 loop
+                        for R in Register_Index range 0 .. 3 loop
                            declare
                               Img : String := R'Image;
                            begin
@@ -1088,7 +1088,7 @@ package body Aqua.CPU is
       G_S : Word renames This.State.G_S;
    begin
       if Enable_Trace then
-         Ada.Text_IO.Put_Line
+         Aqua.Logging.Log
            ("out of registers; writing stack to "
             & Aqua.Images.Hex_Image (G_S));
       end if;
