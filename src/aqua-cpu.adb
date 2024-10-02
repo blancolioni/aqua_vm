@@ -640,6 +640,9 @@ package body Aqua.CPU is
                            This.Get_Word_32 (P, Ch);
                            P := P + 4;
                            Message (I) := Character'Val (Ch);
+                        exception
+                           when Constraint_Error =>
+                              Message (I) := '?';
                         end;
                      end loop;
                      Ada.Text_IO.Put_Line
