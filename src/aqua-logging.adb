@@ -1,3 +1,4 @@
+with Ada.Directories;
 with Ada.Text_IO;
 
 package body Aqua.Logging is
@@ -24,7 +25,12 @@ package body Aqua.Logging is
    procedure Start is
    begin
       Logging_Enabled := True;
-      Ada.Text_IO.Create (File, Ada.Text_IO.Out_File, "trace.txt");
+      if Ada.Directories.Exists ("trace.txt") then
+         Ada.Text_IO.Open (File, Ada.Text_IO.Append_File, "trace.txt");
+         Ada.Text_IO.Put_Line (File, "--------------------------------------");
+      else
+         Ada.Text_IO.Create (File, Ada.Text_IO.Out_File, "trace.txt");
+      end if;
    end Start;
 
    ----------
