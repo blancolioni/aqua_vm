@@ -1,5 +1,5 @@
 name = "aqua_vm"
-description = "Shiny new project"
+description = "Aqua virtual machine"
 version = "0.1.0-dev"
 
 authors = ["Fraser Wilson"]

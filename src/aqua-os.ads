@@ -1,6 +1,8 @@
+private with Ada.Containers.Indefinite_Hashed_Maps;
 private with Ada.Containers.Indefinite_Ordered_Maps;
 private with Ada.Containers.Doubly_Linked_Lists;
-private with WL.String_Maps;
+private with Ada.Strings.Hash_Case_Insensitive;
+private with Ada.Strings.Equal_Case_Insensitive;
 
 with System.Storage_Elements;
 
@@ -122,7 +124,11 @@ private
       end record;
 
    package Symbol_Reference_Maps is
-     new WL.String_Maps (Symbol_Reference);
+     new Ada.Containers.Indefinite_Hashed_Maps
+       (Key_Type        => String,
+        Element_Type    => Symbol_Reference,
+        Hash            => Ada.Strings.Hash_Case_Insensitive,
+        Equivalent_Keys => Ada.Strings.Equal_Case_Insensitive);
 
    type Undefined_Reference (Length : Natural) is
       record
@@ -145,7 +151,11 @@ private
       end record;
 
    package Module_Maps is
-      new WL.String_Maps (Module_Reference);
+     new Ada.Containers.Indefinite_Hashed_Maps
+       (Key_Type        => String,
+        Element_Type    => Module_Reference,
+        Hash            => Ada.Strings.Hash_Case_Insensitive,
+        Equivalent_Keys => Ada.Strings.Equal_Case_Insensitive);
 
    function Find
      (Map : Module_Maps.Map;
