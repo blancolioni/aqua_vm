@@ -1177,21 +1177,23 @@ package body Aqua.CPU is
                  "addr=" & Aqua.Images.Hex_Image (Virtual_PC)
                  & " ir=" & Aqua.Images.Hex_Image (IR);
             when E : Aqua.MM.Protection_Fault =>
-               --  for Index in 0 .. This.State.G_L - 1 loop
-               --     declare
-               --        Img : String := Index'Image;
-               --     begin
-               --        Img (Img'First) := '%';
-               --        Ada.Text_IO.Put
-               --          (Ada.Text_IO.Standard_Error, Img);
-               --        Ada.Text_IO.Set_Col
-               --          (Ada.Text_IO.Standard_Error, 8);
-               --        Ada.Text_IO.Put_Line
-               --          (Ada.Text_IO.Standard_Error,
-               --           Aqua.Images.Hex_Image
-               --             (This.Get_R (Register_Index (Index))));
-               --     end;
-               --  end loop;
+               Ada.Text_IO.Put_Line
+                 ("Local register count:" & This.State.G_L'Image);
+               for Index in 0 .. This.State.G_L - 1 loop
+                  declare
+                     Img : String := Index'Image;
+                  begin
+                     Img (Img'First) := '%';
+                     Ada.Text_IO.Put
+                       (Ada.Text_IO.Standard_Error, Img);
+                     Ada.Text_IO.Set_Col
+                       (Ada.Text_IO.Standard_Error, 8);
+                     Ada.Text_IO.Put_Line
+                       (Ada.Text_IO.Standard_Error,
+                        Aqua.Images.Hex_Image
+                          (This.Get_R (Register_Index (Index))));
+                  end;
+               end loop;
 
                raise Aqua.MM.Protection_Fault with
                  "pc " & Aqua.Images.Hex_Image (Virtual_PC)
