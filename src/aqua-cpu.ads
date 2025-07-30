@@ -29,6 +29,10 @@ package Aqua.CPU is
       Initial_Location : Address_Type;
       Arguments        : Array_Of_Words := []);
 
+   function Exit_Status
+     (This : Instance'Class)
+      return Word_32;
+
    procedure Reset (This : in out Instance'Class);
 
    procedure Trace (Enabled : Boolean);
@@ -47,6 +51,7 @@ private
 
    G_Bootstrap      : constant System_Global := 0;
    G_Dividend       : constant System_Global := 1;
+   G_Exit_Status    : constant System_Global := 23;
    G_Global         : constant System_Global := 19;
    G_Jump           : constant System_Global := 4;
    G_Local          : constant System_Global := 20;
@@ -77,6 +82,7 @@ private
          G_B        : Word := 0;
          G_BB       : Word := 0;
          G_D        : Word := 0;
+         G_E        : Word := 0;
          G_G        : Register_Index := 255;
          G_J        : Word := 0;
          G_L        : Register_Index := 0;
@@ -136,6 +142,11 @@ private
      (This    : in out Instance;
       Address : Address_Type;
       Value   : Word_32);
+
+   function Exit_Status
+     (This : Instance'Class)
+      return Word_32
+   is (This.State.G_E);
 
    function Is_Global
      (This : Instance'Class;

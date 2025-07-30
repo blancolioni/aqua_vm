@@ -47,14 +47,19 @@ package Aqua.Server is
       Arguments : Aqua.Array_Of_Words;
       Trace     : Boolean := False);
 
+   function Exit_Status
+     (This : Instance'Class)
+      return Word_32;
+
 private
 
    type Instance is tagged
       record
-         Bus   : Aqua.Bus.Reference;
-         CPU   : Aqua.CPU.Reference;
-         OS    : Aqua.OS.Reference;
-         Start : Aqua.Address_Type;
+         Bus    : Aqua.Bus.Reference;
+         CPU    : Aqua.CPU.Reference;
+         OS     : Aqua.OS.Reference;
+         Start  : Aqua.Address_Type;
+         Status : Word_32 := 0;
       end record;
 
    function Get_Symbol_Address
@@ -62,5 +67,10 @@ private
       Name : String)
       return Address_Type
    is (This.OS.Get_Symbol_Address (Name));
+
+   function Exit_Status
+     (This : Instance'Class)
+      return Word_32
+   is (This.Status);
 
 end Aqua.Server;

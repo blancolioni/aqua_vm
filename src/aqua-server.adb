@@ -79,6 +79,7 @@ package body Aqua.Server is
       Aqua.CPU.Trace (Trace);
       --  Aqua.OS.Trace_Loading (Trace);
       This.CPU.Start (This.Start);
+      This.Status := This.CPU.Exit_Status;
    end Run;
 
    ---------
@@ -95,6 +96,7 @@ package body Aqua.Server is
       Aqua.CPU.Trace (Trace);
       --  Aqua.OS.Trace_Loading (Trace);
       This.CPU.Start (Start, Arguments);
+      This.Status := This.CPU.Exit_Status;
    end Run;
 
 end Aqua.Server;

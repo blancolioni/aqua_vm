@@ -899,6 +899,8 @@ package body Aqua.CPU is
             case System_Global (G) is
                when G_Bootstrap   =>
                   This.State.G_B := V;
+               when G_Exit_Status =>
+                  This.State.G_E := V;
                when G_Global =>
                   This.State.G_G := Register_Index (V mod 256);
                when G_Jump =>
